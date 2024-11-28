@@ -5,24 +5,18 @@
 
 package net.minecraftforge.fart.internal;
 
-import java.io.IOException;
-import java.nio.file.FileSystem;
-import java.nio.file.FileSystems;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Stream;
-
 import net.minecraftforge.fart.api.ClassProvider;
+import org.jetbrains.annotations.NotNull;
+
+import java.io.IOException;
+import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class ClassProviderBuilderImpl implements ClassProvider.Builder {
     private final List<FileSystem> fileSystems = new ArrayList<>();
-    private final Map<String, Path> sources = new HashMap<>();
+    private final Map<String, Set<Path>> sources = new HashMap<>();
     private final Map<String, Optional<? extends ClassProvider.IClassInfo>> classInfos = new ConcurrentHashMap<>();
     private boolean cacheAll = false;
 
@@ -35,7 +29,7 @@ public class ClassProviderBuilderImpl implements ClassProvider.Builder {
             if (Files.isDirectory(path)) {
                 libraryDir = path;
             } else if (Files.isRegularFile(path)) {
-                FileSystem zipFs = FileSystems.newFileSystem(path, (ClassLoader) null);
+                FileSystem zipFs = FileSystems.newFileSystem(path, null);
                 this.fileSystems.add(zipFs);
                 libraryDir = zipFs.getPath("/");
             } else {
@@ -43,15 +37,21 @@ public class ClassProviderBuilderImpl implements ClassProvider.Builder {
                 return this;
             }
 
-            try (Stream<Path> walker = Files.walk(libraryDir)) {
-                walker.forEach(fullPath -> {
-                    Path relativePath = libraryDir.relativize(fullPath);
-                    String pathName = relativePath.toString().replace('\\', '/');
-                    if (!pathName.endsWith(".class") || pathName.startsWith("META-INF"))
-                        return;
-                    this.sources.putIfAbsent(pathName.substring(0, pathName.length() - 6), fullPath);
-                });
-            }
+            Files.walkFileTree(
+                libraryDir, new SimpleFileVisitor<Path>() {
+                    @Override
+                    public @NotNull FileVisitResult preVisitDirectory(Path dir, @NotNull BasicFileAttributes attrs) {
+                        Path relativePath = libraryDir.relativize(dir);
+                        if (relativePath.startsWith("META-INF")) return FileVisitResult.CONTINUE;
+                        sources.computeIfAbsent(
+                            relativePath.toString().replace('\\', '/'),
+                            ignored -> new HashSet<>()
+                        ).add(dir);
+                        return FileVisitResult.CONTINUE;
+                    }
+                }
+            );
+
         } catch (IOException e) {
             throw new RuntimeException("Could not add library: " + path.toAbsolutePath(), e);
         }

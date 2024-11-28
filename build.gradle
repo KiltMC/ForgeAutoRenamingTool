@@ -17,7 +17,7 @@ plugins {
 }
 apply plugin: 'net.minecraftforge.gradleutils'
 
-group 'net.minecraftforge'
+group 'dev.su5ed.sinytra'
 version = gradleutils.getTagOffsetBranchVersion(null, 'master', 'HEAD')
 println('Version: ' + version)
 
