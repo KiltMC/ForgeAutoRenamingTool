@@ -14,19 +14,14 @@ import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.MethodNode;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.nio.file.FileSystem;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -74,7 +69,9 @@ public class ClassProviderImpl implements ClassProvider {
             return Optional.empty();
 
         try {
-            byte[] data = Util.toByteArray(Files.newInputStream(source));
+            InputStream stream = Files.newInputStream(source);
+            byte[] data = Util.toByteArray(stream);
+            stream.close();
             return Optional.of(data);
         } catch (IOException e) {
             throw new RuntimeException("Could not get data to compute class info in file: " + source.toAbsolutePath(), e);
