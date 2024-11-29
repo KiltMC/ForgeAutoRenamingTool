@@ -100,6 +100,9 @@ assemble.dependsOn shadowJar
 publishing {
     publications {
         mavenJava(MavenPublication) {
+            groupId = "xyz.bluspring"
+            artifactId = "AutoRenamingTool"
+
             from components.java
             pom {
                 name = TITLE
@@ -132,7 +135,13 @@ publishing {
         }
     }
     repositories {
-        maven gradleutils.getPublishingForgeMaven()
+        maven {
+            url = uri("https://mvn.devos.one/snapshots")
+            credentials {
+                username = System.getenv()["MAVEN_USER"]
+                password = System.getenv()["MAVEN_PASS"]
+            }
+        }
     }
 }
 
