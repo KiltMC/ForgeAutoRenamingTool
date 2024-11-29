@@ -32,7 +32,7 @@ public class ClassLoaderClassProvider implements ClassProvider {
     @Override
     public Optional<byte[]> getClassBytes(String cls) {
         String resource = cls + ".class";
-        try(InputStream is = this.classLoader.getResourceAsStream(resource)) {
+        try(InputStream is = getClassStream(cls)) {
             if (is != null) {
                 return Optional.of(Util.toByteArray(is));
             }
@@ -40,6 +40,12 @@ public class ClassLoaderClassProvider implements ClassProvider {
             throw new RuntimeException("Could not get data to compute class info in file: " + resource, e);
         }
         return Optional.empty();
+    }
+
+    @Override
+    public @Nullable InputStream getClassStream(final String cls) {
+        String resource = cls + ".class";
+        return this.classLoader.getResourceAsStream(resource);
     }
 
     @Override

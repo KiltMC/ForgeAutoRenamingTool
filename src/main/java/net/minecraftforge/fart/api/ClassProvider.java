@@ -14,6 +14,8 @@ import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.MethodNode;
 
 import java.io.Closeable;
+import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.nio.file.Path;
@@ -83,6 +85,8 @@ public interface ClassProvider extends Closeable {
     Optional<? extends IClassInfo> getClass(String cls);
 
     Optional<byte[]> getClassBytes(String cls);
+
+    @Nullable InputStream getClassStream(String cls) throws IOException;
 
     /**
      * A {@code ClassProvider.Builder} is used to configure and construct a {@link ClassProvider}.

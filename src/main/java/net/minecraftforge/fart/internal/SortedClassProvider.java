@@ -6,8 +6,10 @@
 package net.minecraftforge.fart.internal;
 
 import net.minecraftforge.fart.api.ClassProvider;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -38,6 +40,17 @@ class SortedClassProvider implements ClassProvider {
             }
         }
         return Optional.empty();
+    }
+
+    @Override
+    public @Nullable InputStream getClassStream(final String cls) throws IOException {
+        for (ClassProvider provider : this.classProviders) {
+            @Nullable InputStream stream = provider.getClassStream(cls);
+            if (stream != null) {
+                return stream;
+            }
+        }
+        return null;
     }
 
     private Optional<? extends IClassInfo> computeClassInfo(String name) {

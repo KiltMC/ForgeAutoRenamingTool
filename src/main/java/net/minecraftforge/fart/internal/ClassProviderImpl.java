@@ -14,19 +14,14 @@ import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.MethodNode;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.nio.file.FileSystem;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -40,10 +35,10 @@ public class ClassProviderImpl implements ClassProvider {
      */
     private final List<FileSystem> fileSystems;
     /**
-     * Holds a map of ZIP entry name / full classname -> path to the class file.
+     * Holds a map of directories -> path.
      * Always uses {@code /} for path delimiters.
      */
-    private final Map<String, Path> sources;
+    private final Map<String, Set<Path>> sources;
     /**
      * Only holds classes explicitly added through the builder with their raw class bytes.
      */
@@ -54,7 +49,12 @@ public class ClassProviderImpl implements ClassProvider {
     @Nullable
     private final Map<String, Optional<? extends IClassInfo>> classCache;
 
-    ClassProviderImpl(List<FileSystem> fileSystems, Map<String, Path> sources, Map<String, Optional<? extends IClassInfo>> classInfos, boolean cacheAll) {
+    ClassProviderImpl(
+        List<FileSystem> fileSystems,
+        Map<String, Set<Path>> sources,
+        Map<String, Optional<? extends IClassInfo>> classInfos,
+        boolean cacheAll
+    ) {
         this.fileSystems = Collections.unmodifiableList(fileSystems);
         this.sources = Collections.unmodifiableMap(sources);
         this.classInfos = Collections.unmodifiableMap(classInfos);
@@ -63,22 +63,41 @@ public class ClassProviderImpl implements ClassProvider {
 
     @Override
     public Optional<? extends IClassInfo> getClass(String name) {
-        return this.classCache != null ? this.classCache.computeIfAbsent(name, this::computeClassInfo) : computeClassInfo(name);
+        return this.classCache != null
+               ? this.classCache.computeIfAbsent(name, this::computeClassInfo)
+               : computeClassInfo(name);
     }
 
     @Override
     public Optional<byte[]> getClassBytes(String cls) {
-        Path source = this.sources.get(cls);
-
-        if (source == null)
-            return Optional.empty();
-
         try {
-            byte[] data = Util.toByteArray(Files.newInputStream(source));
+            InputStream stream = getClassStream(cls);
+            if (stream == null) return Optional.empty();
+            byte[] data = Util.toByteArray(stream);
+            stream.close();
             return Optional.of(data);
         } catch (IOException e) {
-            throw new RuntimeException("Could not get data to compute class info in file: " + source.toAbsolutePath(), e);
+            throw new RuntimeException(
+                "Could not get data to compute class info in file: " + cls,
+                e
+            );
         }
+    }
+
+    @Override
+    public @Nullable InputStream getClassStream(final String cls) throws IOException {
+        Path source = getSourcePath(cls);
+        if (source == null) return null;
+        return Files.newInputStream(source);
+    }
+
+    private Path getSourcePath(String cls) {
+        Set<Path> paths = this.sources.get(cls.substring(0, cls.lastIndexOf('/')));
+        if (paths == null) return null;
+        return paths.stream()
+                    .filter(it -> Files.exists(it.resolve(cls + ".class")))
+                    .findFirst()
+                    .orElse(null);
     }
 
     private Optional<? extends IClassInfo> computeClassInfo(String name) {
@@ -113,18 +132,25 @@ public class ClassProviderImpl implements ClassProvider {
             this.name = node.name;
             this.access = new Access(node.access);
             this.superName = node.superName;
-            this.interfaces = node.interfaces.isEmpty() ? Collections.emptyList() : Collections.unmodifiableList(node.interfaces);
+            this.interfaces =
+                node.interfaces.isEmpty() ? Collections.emptyList() : Collections.unmodifiableList(node.interfaces);
 
             if (!node.methods.isEmpty())
                 this.methods = Collections.unmodifiableMap(node.methods.stream().map(MethodInfo::new)
-                    .collect(Collectors.toMap(m -> m.getName() + m.getDescriptor(), Function.identity())));
+                                                                       .collect(Collectors.toMap(
+                                                                           m -> m.getName() + m.getDescriptor(),
+                                                                           Function.identity()
+                                                                       )));
             else
                 this.methods = null;
 
 
             if (!node.fields.isEmpty())
                 this.fields = Collections.unmodifiableMap(node.fields.stream().map(FieldInfo::new)
-                    .collect(Collectors.toMap(FieldInfo::getName, Function.identity())));
+                                                                     .collect(Collectors.toMap(
+                                                                         FieldInfo::getName,
+                                                                         Function.identity()
+                                                                     )));
             else
                 this.fields = null;
         }
@@ -134,7 +160,8 @@ public class ClassProviderImpl implements ClassProvider {
             this.access = new Access(node.getModifiers());
             this.superName = Util.nameToBytecode(node.getSuperclass());
             this.interfaces = Collections.unmodifiableList(Arrays.stream(node.getInterfaces())
-                .map(c -> Util.nameToBytecode(c)).collect(Collectors.toList()));
+                                                                 .map(c -> Util.nameToBytecode(c))
+                                                                 .collect(Collectors.toList()));
 
             Map<String, MethodInfo> mtds = Stream.concat(
                 Arrays.stream(node.getConstructors()).map(MethodInfo::new),
@@ -146,7 +173,10 @@ public class ClassProviderImpl implements ClassProvider {
             Field[] flds = node.getDeclaredFields();
             if (flds != null && flds.length > 0) {
                 this.fields = Collections.unmodifiableMap(Arrays.asList(flds).stream().map(FieldInfo::new)
-                    .collect(Collectors.toMap(FieldInfo::getName, Function.identity())));
+                                                                .collect(Collectors.toMap(
+                                                                    FieldInfo::getName,
+                                                                    Function.identity()
+                                                                )));
             } else
                 this.fields = null;
         }
@@ -155,11 +185,13 @@ public class ClassProviderImpl implements ClassProvider {
         public String getName() {
             return name;
         }
+
         @Nullable
         @Override
         public String getSuper() {
             return superName;
         }
+
         @Override
         public int getAccess() {
             return access.getValue();
@@ -177,7 +209,8 @@ public class ClassProviderImpl implements ClassProvider {
         @Override
         public Collection<? extends IFieldInfo> getFields() {
             if (fieldsView == null)
-                fieldsView = fields == null ? Collections.emptyList() : Collections.unmodifiableCollection(fields.values());
+                fieldsView =
+                    fields == null ? Collections.emptyList() : Collections.unmodifiableCollection(fields.values());
             return fieldsView;
         }
 
@@ -189,7 +222,8 @@ public class ClassProviderImpl implements ClassProvider {
         @Override
         public Collection<? extends IMethodInfo> getMethods() {
             if (methodsView == null)
-                methodsView = methods == null ? Collections.emptyList() : Collections.unmodifiableCollection(methods.values());
+                methodsView =
+                    methods == null ? Collections.emptyList() : Collections.unmodifiableCollection(methods.values());
             return methodsView;
         }
 
@@ -241,7 +275,8 @@ public class ClassProviderImpl implements ClassProvider {
 
             @Override
             public String toString() {
-                return getAccessLevel().toString() + ' ' + ClassInfo.this.getName() + '/' + getName() + ' ' + getDescriptor();
+                return getAccessLevel().toString() + ' ' + ClassInfo.this.getName() + '/' + getName() + ' ' +
+                       getDescriptor();
             }
         }
 
@@ -296,32 +331,34 @@ public class ClassProviderImpl implements ClassProvider {
     private static class Access {
         private static int[] ACC = new int[23];
         private static String[] NAME = new String[23];
+
         static {
             int idx = 0;
-            put(idx++, ACC_PUBLIC,      "public");
-            put(idx++, ACC_PRIVATE,     "private");
-            put(idx++, ACC_PROTECTED,   "protected");
-            put(idx++, ACC_STATIC,      "static");
-            put(idx++, ACC_FINAL,       "final");
-            put(idx++, ACC_SUPER,       "super");
-            put(idx++, ACC_SYNCHRONIZED,"synchronized");
-            put(idx++, ACC_OPEN,        "open");
-            put(idx++, ACC_TRANSITIVE,  "transitive");
-            put(idx++, ACC_VOLATILE,    "volatile");
-            put(idx++, ACC_BRIDGE,      "bridge");
-            put(idx++, ACC_STATIC_PHASE,"static_phase");
-            put(idx++, ACC_VARARGS,     "varargs");
-            put(idx++, ACC_TRANSIENT,   "transient");
-            put(idx++, ACC_NATIVE,      "native");
-            put(idx++, ACC_INTERFACE,   "interface");
-            put(idx++, ACC_ABSTRACT,    "abstract");
-            put(idx++, ACC_STRICT,      "strict");
-            put(idx++, ACC_SYNTHETIC,   "synthetic");
-            put(idx++, ACC_ANNOTATION , "annotation");
-            put(idx++, ACC_ENUM,        "enum");
-            put(idx++, ACC_MANDATED,    "mandated");
-            put(idx++, ACC_MODULE,      "module");
+            put(idx++, ACC_PUBLIC, "public");
+            put(idx++, ACC_PRIVATE, "private");
+            put(idx++, ACC_PROTECTED, "protected");
+            put(idx++, ACC_STATIC, "static");
+            put(idx++, ACC_FINAL, "final");
+            put(idx++, ACC_SUPER, "super");
+            put(idx++, ACC_SYNCHRONIZED, "synchronized");
+            put(idx++, ACC_OPEN, "open");
+            put(idx++, ACC_TRANSITIVE, "transitive");
+            put(idx++, ACC_VOLATILE, "volatile");
+            put(idx++, ACC_BRIDGE, "bridge");
+            put(idx++, ACC_STATIC_PHASE, "static_phase");
+            put(idx++, ACC_VARARGS, "varargs");
+            put(idx++, ACC_TRANSIENT, "transient");
+            put(idx++, ACC_NATIVE, "native");
+            put(idx++, ACC_INTERFACE, "interface");
+            put(idx++, ACC_ABSTRACT, "abstract");
+            put(idx++, ACC_STRICT, "strict");
+            put(idx++, ACC_SYNTHETIC, "synthetic");
+            put(idx++, ACC_ANNOTATION, "annotation");
+            put(idx++, ACC_ENUM, "enum");
+            put(idx++, ACC_MANDATED, "mandated");
+            put(idx++, ACC_MODULE, "module");
         }
+
         private static void put(int idx, int acc, String name) {
             ACC[idx] = acc;
             NAME[idx] = name;
