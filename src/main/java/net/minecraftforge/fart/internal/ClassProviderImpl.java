@@ -93,10 +93,12 @@ public class ClassProviderImpl implements ClassProvider {
 
     private Path getSourcePath(String cls) {
         String relativePath = cls.substring(0, cls.lastIndexOf('/'));
+        String className = cls.substring(relativePath.length() + 1) + ".class";
         Set<Path> paths = this.sources.get(relativePath);
         if (paths == null) return null;
         return paths.stream()
-                    .filter(it -> Files.exists(it.resolve(cls.substring(relativePath.length() + 1) + ".class")))
+                    .map(it -> it.resolve(className))
+                    .filter(Files::exists)
                     .findFirst()
                     .orElse(null);
     }
