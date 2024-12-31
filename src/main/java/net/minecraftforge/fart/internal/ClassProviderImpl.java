@@ -96,7 +96,7 @@ public class ClassProviderImpl implements ClassProvider {
         Set<Path> paths = this.sources.get(relativePath);
         if (paths == null) return null;
         return paths.stream()
-                    .filter(it -> Files.exists(it.resolve(cls.substring(relativePath.length()) + ".class")))
+                    .filter(it -> Files.exists(it.resolve(cls.substring(relativePath.length() + 1) + ".class")))
                     .findFirst()
                     .orElse(null);
     }
