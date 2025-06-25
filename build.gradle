@@ -36,7 +36,7 @@ ext {
             'Specification-Version':    gradleutils.gitInfo.tag,
             'Implementation-Title':     'SimpleInstaller',
             'Implementation-Version':   project.version,
-            'Implementation-Vendor':    'Forge Development LLC'
+            'Implementation-Vendor':    'BluSpring'
         ] as LinkedHashMap, 'net/minecraftforge/fart/')
     }
     INITIAL_CHANGELOG_TAG = '0.1'
@@ -107,15 +107,15 @@ publishing {
             pom {
                 name = TITLE
                 description = 'A tool that renames java bytecode elements.'
-                url = "https://github.com/MinecraftForge/${REPO}"
+                url = "https://github.com/KiltMC/${REPO}"
                 scm {
-                    url = "https://github.com/MinecraftForge/${REPO}"
-                    connection = "scm:git:git://github.com/MinecraftForge/${REPO}.git"
-                    developerConnection = "scm:git:git@github.com:MinecraftForge/${REPO}.git"
+                    url = "https://github.com/KiltMC/${REPO}"
+                    connection = "scm:git:git://github.com/KiltMC/${REPO}.git"
+                    developerConnection = "scm:git:git@github.com:KiltMC/${REPO}.git"
                 }
                 issueManagement {
                     system = 'github'
-                    url = "https://github.com/MinecraftForge/${REPO}/issues"
+                    url = "https://github.com/KiltMC/${REPO}/issues"
                 }
 
                 licenses {
@@ -129,6 +129,10 @@ publishing {
                     developer {
                         id = 'LexManos'
                         name = 'LexManos'
+                    }
+                    developer {
+                        id = "BluSpring"
+                        name = "BluSpring"
                     }
                 }
             }
