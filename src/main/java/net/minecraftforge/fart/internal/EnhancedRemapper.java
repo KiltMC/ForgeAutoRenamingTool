@@ -365,6 +365,10 @@ public class EnhancedRemapper extends Remapper {
                 return this.key;
             }
 
+            public MClass getDeclaringClass() {
+                return MClass.this;
+            }
+
             @Override
             public String toString() {
                 return MClass.this.getName() + '/' + getName() + ' ' + getDescriptor();
@@ -437,6 +441,10 @@ public class EnhancedRemapper extends Remapper {
 
             public String mapParameter(int index, String name) {
                 return this.params != null && index >= 0 && index < this.params.length ? this.params[index] : name;
+            }
+
+            public MClass getDeclaringClass() {
+                return MClass.this;
             }
 
             @Override
